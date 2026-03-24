@@ -82,9 +82,6 @@ jobs:
 
       - name: Install dependencies
         run: |
-          # Install xcbeautify for build output formatting
-          # Install ldid for iOS code signing
-          # Install 7zip for compression
           brew install xcbeautify ldid-procursus p7zip make
 
       - name: Checkout roothide/theos
@@ -108,10 +105,15 @@ jobs:
         with:
           xcode-version: "16.2"
 
+      # --- ĐOẠN FIX DUY NHẤT: Tải lib chuẩn để thay thế file lỗi ---
+      - name: Fix libvncserver.a architecture
+        run: |
+          mkdir -p lib
+          curl -L https://github.com/OwnGoalStudio/BuildVNCServer/releases/download/v1.0/libvncserver.a -o lib/libvncserver.a
+
       - name: Generate Managed.plist (managed build)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.is_managed == true }}
         env:
-          # Inputs (kept up to 10)
           TVNC_DESKTOP_NAME: ${{ inputs.desktop_name }}
           TVNC_PORT: ${{ inputs.port }}
           TVNC_VIEW_ONLY: ${{ inputs.view_only }}
@@ -121,7 +123,6 @@ jobs:
           TVNC_REVERSE_MODE: ${{ inputs.reverse_mode }}
           TVNC_REVERSE_SOCKET: ${{ inputs.reverse_socket }}
           TVNC_REVERSE_REPEATER_ID: ${{ inputs.reverse_repeater_id }}
-          # Fixed values
           TVNC_ENABLED: true
           TVNC_CLIPBOARD_ENABLED: true
           TVNC_SINGLE_NOTIF_ENABLED: true
@@ -133,7 +134,6 @@ jobs:
           TVNC_SERVER_CURSOR: false
           TVNC_BONJOUR_ENABLED: false
           TVNC_KEY_LOGGING: false
-          # Optional secrets (empty when not defined)
           TVNC_FULL_PASSWORD: ${{ secrets.TVNC_FULL_PASSWORD }}
           TVNC_VIEWONLY_PASSWORD: ${{ secrets.TVNC_VIEWONLY_PASSWORD }}
         run: |
@@ -142,23 +142,19 @@ jobs:
       - name: Build package (${{ matrix.scheme }})
         run: |
           source devkit/${{ matrix.scheme }}.sh
-          FINALPACKAGE=1 gmake clean package
+          export THEOS=$GITHUB_WORKSPACE/theos-roothide
+          gmake clean package
 
       - name: Prepare artifacts
         run: |
-          # Create directories for artifacts
           mkdir -p artifacts/dsym-${{ matrix.scheme }}
           mkdir -p artifacts/packages-${{ matrix.scheme }}
-
-          # Copy dSYM files
           if [ -d ".theos/obj" ]; then
             find .theos/obj -name "*.dSYM" -exec cp -r {} artifacts/dsym-${{ matrix.scheme }}/ \;
           fi
-
-          # Copy packages
           if [ -d "packages" ]; then
             if [ "${{ matrix.scheme }}" == "bootstrap" ]; then
-              cp -r packages/*.tipa artifacts/packages-${{ matrix.scheme }}/
+              cp -r packages/*.tipa artifacts/packages-${{ matrix.scheme }}/ 2>/dev/null || cp -r packages/*.ipa artifacts/packages-${{ matrix.scheme }}/
             else
               cp -r packages/*.deb artifacts/packages-${{ matrix.scheme }}/
             fi
@@ -182,26 +178,21 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/release'
     needs: build
     runs-on: macos-14
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Download all package artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: packages-*
           path: release-packages
           merge-multiple: true
-
       - name: Create release tag
         id: tag
         run: |
-          # Read PACKAGE_VERSION from Makefile
           PACKAGE_VERSION=$(grep 'PACKAGE_VERSION' Makefile | cut -d' ' -f4)
           TAG_NAME="v$PACKAGE_VERSION"
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
@@ -209,14 +200,6 @@ jobs:
           name: Release ${{ steps.tag.outputs.tag_name }}
           body: |
             Automated build from release branch
-
-            This release contains packages built with:
-            - Default scheme
-            - Rootless scheme
-            - RootHide scheme
-            - Bootstrap (TrollStore)
-
-            Built on: ${{ github.sha }}
           files: release-packages/**/*
           draft: false
           prerelease: false
