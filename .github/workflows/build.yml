@@ -13,25 +13,24 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Tools
+      - name: Setup Theos and Tools
         run: |
-          # Cài đặt ldid và dpkg để ký và đóng gói ứng dụng
+          # 1. Cài đặt công cụ hệ thống
           brew install ldid dpkg
-
-      - name: Setup Theos
-        run: |
+          
+          # 2. Tải Theos
           export THEOS=$HOME/theos
           git clone --recursive https://github.com/theos/theos.git $THEOS
+          
+          # 3. Tải SDK
+          git clone https://github.com/theos/sdks.git $THEOS/sdks
+          
+          # 4. Lưu biến môi trường cho các bước sau
           echo "THEOS=$THEOS" >> $GITHUB_ENV
-
-      - name: Setup iOS SDK
-        run: |
-          rm -rf $HOME/theos/sdks
-          git clone https://github.com/theos/sdks.git $HOME/theos/sdks
 
       - name: Compile Project
         run: |
-          # Chạy lệnh biên dịch và đóng gói
+          # Gọi lệnh biên dịch với đường dẫn Theos cụ thể
           make package FINALPACKAGE=1
         env:
           THEOS: ${{ env.THEOS }}
