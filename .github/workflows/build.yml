@@ -1,11 +1,11 @@
-name: Build TrollVNC - Ultimate Fix
+name: Build TrollVNC - Professional Auto-Build
 
 on:
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-14
 
     steps:
       - name: Checkout code
@@ -14,48 +14,51 @@ jobs:
           submodules: recursive
 
       - name: Install Tools
-        run: brew install ldid dpkg
+        run: brew install ldid dpkg cmake xcbeautify
 
-      - name: Setup Theos
+      - name: Setup Theos & SDK
         run: |
           export THEOS=$HOME/theos
           git clone --recursive https://github.com/theos/theos.git $THEOS
+          git clone https://github.com/theos/sdks.git $THEOS/sdks
           echo "THEOS=$THEOS" >> $GITHUB_ENV
 
-      - name: Setup iOS SDK
+      - name: Build LibVNCServer from Source
         run: |
-          git clone https://github.com/theos/sdks.git $HOME/temporary_sdks
-          rm -rf $HOME/theos/sdks
-          mv $HOME/temporary_sdks $HOME/theos/sdks
+          # Bước này tự tạo ra thư viện chuẩn arm64, không lo lỗi "unknown file type"
+          git clone https://github.com/LibVNC/libvncserver.git
+          cd libvncserver
+          mkdir build && cd build
+          cmake .. -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64
+          make -j$(sysctl -n hw.ncpu)
+          cp libvncserver/libvncserver.a ../../lib/
+          cd ../..
 
-      - name: Build Package
+      - name: Compile TrollVNC
         run: |
-          # Xóa file lib cũ gây lỗi nếu có
-          rm -rf lib/libvncserver.a
-          
-          # Cố gắng biên dịch
-          make package FINALPACKAGE=1
+          # Xóa cache cũ và build mới hoàn toàn
+          make clean package FINALPACKAGE=1
         env:
           THEOS: ${{ env.THEOS }}
 
-      - name: Manual Packaging (If make fails)
+      - name: Package IPA Manually
         if: always()
         run: |
-          mkdir -p final_ipa
-          # Tìm file .app trong thư mục tạm của Theos
+          mkdir -p final_output
+          # Tìm file sản phẩm
+          find packages -name "*.tipa" -exec cp {} final_output/TrollVNC.ipa \;
+          find packages -name "*.deb" -exec cp {} final_output/TrollVNC.deb \;
+          
+          # Cứu vãn: Nếu không thấy file đóng gói, tự nén thư mục .app
           APP_PATH=$(find .theos/obj -name "*.app" -type d | head -n 1)
           if [ -n "$APP_PATH" ]; then
-            echo "Found app at $APP_PATH. Packaging manually..."
             mkdir -p Payload
             cp -r "$APP_PATH" Payload/
-            zip -vr final_ipa/TrollVNC.ipa Payload/
+            zip -vr final_output/TrollVNC_Manual.ipa Payload/
           fi
 
-      - name: Upload
+      - name: Upload Result
         uses: actions/upload-artifact@v4
         with:
-          name: TrollVNC-Result
-          path: |
-            packages/*.ipa
-            packages/*.tipa
-            final_ipa/*.ipa
+          name: TrollVNC-Final-Build
+          path: final_output/*
