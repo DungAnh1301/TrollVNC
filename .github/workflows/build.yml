@@ -1,4 +1,4 @@
-name: Build TrollVNC - Fix Lib Error
+name: Build TrollVNC - Force Final
 
 on:
   workflow_dispatch:
@@ -14,7 +14,7 @@ jobs:
           submodules: recursive
 
       - name: Install Tools
-        run: brew install ldid dpkg
+        run: brew install ldid dpkg cmake
 
       - name: Setup Theos
         run: |
@@ -28,40 +28,43 @@ jobs:
           rm -rf $HOME/theos/sdks
           mv $HOME/temporary_sdks $HOME/theos/sdks
 
-      - name: Remove Corrupted Library and Download New One
+      - name: Build LibVNCServer from Source
         run: |
-          # Xóa bỏ file gây lỗi 'unknown file type'
-          rm -f lib/libvncserver.a
-          mkdir -p lib
-          # Tải bản libvncserver chuẩn dành cho iOS arm64
-          curl -L "https://github.com/OwnGoalStudio/BuildVNCServer/releases/download/v1.0/libvncserver.a" -o lib/libvncserver.a
-          echo "Đã thay thế file lib thành công."
+          # Bước này tự tạo ra linh kiện chuẩn, không dùng hàng có sẵn bị lỗi
+          git clone https://github.com/LibVNC/libvncserver.git
+          cd libvncserver
+          mkdir build && cd build
+          cmake .. -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_ARCHITECTURES=arm64
+          make libvncserver
+          mkdir -p ../../lib
+          cp libvncserver/libvncserver.a ../../lib/
+          cd ../..
 
-      - name: Build Package
+      - name: Build and Package
         run: |
-          # Biên dịch lại từ đầu
+          # Xóa cache cũ và build
           make clean package FINALPACKAGE=1
         env:
           THEOS: ${{ env.THEOS }}
 
-      - name: Collect Results
+      - name: Force IPA Creation
         if: always()
         run: |
-          mkdir -p final_output
-          # Tìm file sản phẩm (TIPA cho TrollStore hoặc DEB)
-          find packages -name "*.tipa" -exec cp {} final_output/TrollVNC.ipa \;
-          find packages -name "*.deb" -exec cp {} final_output/TrollVNC.deb \;
+          mkdir -p final_ipa
+          # Tìm file .tipa hoặc .ipa
+          find packages -name "*.tipa" -exec cp {} final_ipa/TrollVNC.ipa \;
+          find packages -name "*.ipa" -exec cp {} final_ipa/TrollVNC.ipa \;
           
-          # Nếu Theos lỗi không ra file đóng gói, ta tự đóng gói từ thư mục .app
+          # Nếu không thấy, tự đóng gói thư mục .app
           APP_PATH=$(find .theos/obj -name "*.app" -type d | head -n 1)
           if [ -n "$APP_PATH" ]; then
             mkdir -p Payload
             cp -r "$APP_PATH" Payload/
-            zip -vr final_output/TrollVNC_Manual.ipa Payload/
+            zip -vr final_ipa/TrollVNC_Manual.ipa Payload/
           fi
 
       - name: Upload Result
         uses: actions/upload-artifact@v4
         with:
           name: TrollVNC-Final-IPA
-          path: final_output/*
+          path: final_ipa/*
