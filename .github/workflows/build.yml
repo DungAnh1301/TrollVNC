@@ -15,14 +15,15 @@ jobs:
 
       - name: Setup Theos
         run: |
-          # Tải Theos trực tiếp, không dùng brew để tránh lỗi
           export THEOS=$HOME/theos
           git clone --recursive https://github.com/theos/theos.git $THEOS
           echo "THEOS=$THEOS" >> $GITHUB_ENV
 
       - name: Setup iOS SDK
         run: |
-          # Tải SDK cần thiết để biên dịch
+          # Xóa thư mục sdks cũ nếu nó tồn tại để tránh lỗi 128
+          rm -rf $HOME/theos/sdks
+          # Tải bộ SDK mới
           git clone https://github.com/theos/sdks.git $HOME/theos/sdks
 
       - name: Compile Project
