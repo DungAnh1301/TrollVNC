@@ -15,22 +15,23 @@ jobs:
 
       - name: Setup Theos and Tools
         run: |
-          # 1. Cài đặt công cụ hệ thống
+          # 1. Cài đặt công cụ ký mã
           brew install ldid dpkg
           
-          # 2. Tải Theos
+          # 2. Thiết lập đường dẫn Theos
           export THEOS=$HOME/theos
+          echo "THEOS=$THEOS" >> $GITHUB_ENV
+          
+          # 3. Tải Theos Framework
           git clone --recursive https://github.com/theos/theos.git $THEOS
           
-          # 3. Tải SDK
+          # 4. Xóa thư mục sdks cũ và tải bộ SDK mới
+          rm -rf $THEOS/sdks
           git clone https://github.com/theos/sdks.git $THEOS/sdks
-          
-          # 4. Lưu biến môi trường cho các bước sau
-          echo "THEOS=$THEOS" >> $GITHUB_ENV
 
       - name: Compile Project
         run: |
-          # Gọi lệnh biên dịch với đường dẫn Theos cụ thể
+          # Bắt đầu biên dịch
           make package FINALPACKAGE=1
         env:
           THEOS: ${{ env.THEOS }}
