@@ -20,40 +20,35 @@ jobs:
       - name: Setup Theos
         run: |
           export THEOS=$HOME/theos
-          # Tải Theos chính
           git clone --recursive https://github.com/theos/theos.git $THEOS
           echo "THEOS=$THEOS" >> $GITHUB_ENV
 
       - name: Setup iOS SDK
         run: |
-          # 1. Tải SDK vào một thư mục tạm để tránh lỗi 'already exists'
           git clone https://github.com/theos/sdks.git $HOME/temporary_sdks
-          
-          # 2. Xóa thư mục sdks cũ (nếu có) bên trong Theos
           rm -rf $HOME/theos/sdks
-          
-          # 3. Di chuyển SDK từ thư mục tạm vào đúng vị trí
           mv $HOME/temporary_sdks $HOME/theos/sdks
 
       - name: Compile Project
         run: |
-          # 1. Chạy lệnh biên dịch chính
+          # 1. Chạy lệnh biên dịch
           make package FINALPACKAGE=1
           
-          # 2. Tìm kiếm tất cả các file kết quả (.ipa hoặc .deb) và đưa vào một chỗ
-          mkdir -p output_files
-          find . -name "*.ipa" -exec cp {} output_files/ \;
-          find . -name "*.deb" -exec cp {} output_files/ \;
+          # 2. Tạo thư mục để gom file
+          mkdir -p collect_results
           
-          # 3. Hiện danh sách file tìm được để kiểm tra trong Log
-          echo "Các file đã tìm thấy:"
-          ls -R output_files
+          # 3. Tìm TẤT CẢ các file có đuôi .deb hoặc .ipa trong toàn bộ dự án và copy vào collect_results
+          find . -name "*.deb" -exec cp {} collect_results/ \;
+          find . -name "*.ipa" -exec cp {} collect_results/ \;
+          
+          # 4. Hiển thị danh sách file để "bắt quả tang" vị trí file
+          echo "--- DANH SÁCH FILE TÌM THẤY ---"
+          ls -R collect_results
         env:
           THEOS: ${{ env.THEOS }}
 
       - name: Upload Result
         uses: actions/upload-artifact@v4
         with:
-          name: TrollVNC-Packages
-          # Lấy tất cả file trong thư mục output_files vừa tạo
-          path: output_files/*
+          name: TrollVNC-Output
+          path: collect_results/*
