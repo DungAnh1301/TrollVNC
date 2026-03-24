@@ -13,31 +13,31 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install Dependencies
+      - name: Install Basic Tools
         run: |
-          # Chỉ cài các công cụ hỗ trợ có sẵn
-          brew install ldid xz
+          # Chỉ cài ldid để ký mã, không cài 'theos' qua brew nữa
+          brew install ldid
 
-      - name: Setup Theos
+      - name: Setup Theos Framework
         run: |
-          # Tải bộ khung Theos thủ công
-          export THEOS=/Users/runner/theos
+          # Tải Theos thủ công vào thư mục người dùng
+          export THEOS=$HOME/theos
           git clone --recursive https://github.com/theos/theos.git $THEOS
           echo "THEOS=$THEOS" >> $GITHUB_ENV
 
       - name: Setup iOS SDK
         run: |
-          # Tải bộ thư viện iOS SDK
-          git clone https://github.com/theos/sdks.git $THEOS/sdks
+          # Tải bộ thư viện lập trình iOS
+          git clone https://github.com/theos/sdks.git $HOME/theos/sdks
 
       - name: Compile Project
         run: |
-          # Bắt đầu biên dịch
+          # Lệnh biên dịch quan trọng nhất
           make package FINALPACKAGE=1
         env:
-          THEOS: /Users/runner/theos
+          THEOS: ${{ env.THEOS }}
 
-      - name: Upload IPA Artifact
+      - name: Upload IPA Result
         uses: actions/upload-artifact@v4
         with:
           name: TrollVNC-IPA
