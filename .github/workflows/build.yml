@@ -37,12 +37,23 @@ jobs:
 
       - name: Compile Project
         run: |
+          # 1. Chạy lệnh biên dịch chính
           make package FINALPACKAGE=1
+          
+          # 2. Tìm kiếm tất cả các file kết quả (.ipa hoặc .deb) và đưa vào một chỗ
+          mkdir -p output_files
+          find . -name "*.ipa" -exec cp {} output_files/ \;
+          find . -name "*.deb" -exec cp {} output_files/ \;
+          
+          # 3. Hiện danh sách file tìm được để kiểm tra trong Log
+          echo "Các file đã tìm thấy:"
+          ls -R output_files
         env:
           THEOS: ${{ env.THEOS }}
 
-      - name: Upload IPA
+      - name: Upload Result
         uses: actions/upload-artifact@v4
         with:
-          name: TrollVNC-Result
-          path: packages/*.ipa
+          name: TrollVNC-Packages
+          # Lấy tất cả file trong thư mục output_files vừa tạo
+          path: output_files/*
