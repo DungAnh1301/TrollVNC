@@ -63,6 +63,9 @@ on:
         required: false
         default: ""
 
+permissions:
+  contents: write
+
 env:
   FINALPACKAGE: 1
   HOMEBREW_NO_AUTO_UPDATE: 1
@@ -179,9 +182,8 @@ jobs:
           if-no-files-found: warn
 
   release:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/release'
     needs: build
-    runs-on: macos-14
+    runs-on: macos-latest
 
     steps:
       - name: Checkout repository
